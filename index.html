@@ -1,0 +1,487 @@
+<title>Syringe Floor Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one console column. Header strip, tabs, then order picker above the selected order: material issue lines, output and yield, issue log. */
+:root{
+  --bg:#edf1f3; --surface:#fafcfc; --sunk:#e1e9ec; --line:#c7d4d9;
+  --fg:#12222a; --muted:#53666f;
+  --accent:#0a6a77; --accent-fg:#ffffff;
+  --ok:#1b7a4b; --warn:#9a5b00; --bad:#b3261e;
+  --font-display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --font-body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e191e; --surface:#15242b; --sunk:#0b1418; --line:#2a414b;
+    --fg:#e3edf0; --muted:#90a6ae;
+    --accent:#4cc2d1; --accent-fg:#06222a;
+    --ok:#4cc38a; --warn:#f0b44c; --bad:#ff7f76;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e191e; --surface:#15242b; --sunk:#0b1418; --line:#2a414b;
+  --fg:#e3edf0; --muted:#90a6ae;
+  --accent:#4cc2d1; --accent-fg:#06222a;
+  --ok:#4cc38a; --warn:#f0b44c; --bad:#ff7f76;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:var(--font-body); font-size:15px; line-height:1.45;
+  padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:34px;line-height:1.05}
+h2{font-size:24px}
+h3{font-size:18px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+p{margin:0}
+.mono{font-family:var(--font-mono);font-size:13px;letter-spacing:0}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+/* header */
+.head{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--fg);padding-bottom:14px}
+.head .sub{color:var(--muted);margin-top:6px}
+.stats{display:flex;gap:28px;flex-wrap:wrap}
+.stat .fig{font-size:28px}
+.stat .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.fig{font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+
+/* tabs */
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{min-height:44px;padding:0 18px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;background:var(--sunk);color:var(--muted);font:600 15px var(--font-body);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--fg);border-color:var(--fg);border-bottom:1px solid var(--surface);margin-bottom:-1px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.panel-pad{padding:16px}
+.panel-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:4px;font:600 12px var(--font-body);letter-spacing:.05em;text-transform:uppercase;border:1px solid transparent;white-space:nowrap}
+.pill.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--surface));border-color:color-mix(in srgb,var(--ok) 45%,var(--surface))}
+.pill.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:color-mix(in srgb,var(--warn) 45%,var(--surface))}
+.pill.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,var(--surface));border-color:color-mix(in srgb,var(--bad) 45%,var(--surface))}
+.pill.mute{color:var(--muted);background:var(--sunk);border-color:var(--line)}
+.pill.acc{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:color-mix(in srgb,var(--accent) 45%,var(--surface))}
+.pill.hold{color:var(--warn);border-color:var(--warn);background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--warn) 28%,var(--surface)) 0 6px,color-mix(in srgb,var(--warn) 10%,var(--surface)) 6px 12px)}
+
+/* buttons and inputs */
+.btn{min-height:42px;padding:0 16px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);font:600 15px var(--font-body);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:hover{filter:brightness(1.08)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+select,input{min-height:42px;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);padding:0 10px;font:inherit}
+input[type=number]{font-variant-numeric:tabular-nums}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);min-width:0}
+label.f select,label.f input{text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg)}
+.formrow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.formrow .grow{flex:1 1 180px}
+.formrow .qty{flex:0 1 130px}
+
+/* order picker */
+.picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.ocard{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:6px;color:var(--fg);font:inherit;cursor:pointer;min-width:0}
+.ocard[aria-pressed="true"]{border:2px solid var(--accent);padding:13px}
+.ocard .top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.ocard .no{font-family:var(--font-display);font-weight:700;font-size:24px}
+
+/* material lines */
+.line{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px 28px;padding:16px;border-top:1px solid var(--line)}
+.line:first-of-type{border-top:0}
+.line .nm{font-weight:600;font-size:16px}
+.nums{display:flex;flex-wrap:wrap;gap:6px 22px;margin:8px 0}
+.nums div{display:flex;flex-direction:column}
+.nums .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.bar{height:8px;background:var(--sunk);border-radius:2px;overflow:hidden;margin:6px 0 10px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.bar>i.over{background:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--font-mono);font-size:12px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:2px 7px}
+.hint{margin-top:8px;font-size:13px}
+.bad-t{color:var(--bad)} .warn-t{color:var(--warn)} .ok-t{color:var(--ok)} .mute-t{color:var(--muted)}
+.notice{margin-top:10px;padding:10px 12px;border-radius:4px;font-size:14px;border:1px solid}
+.notice.bad{color:var(--bad);border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
+.notice.ok{color:var(--ok);border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--surface))}
+.notice.warn{color:var(--warn);border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+.scan{margin-bottom:10px}
+
+/* yield */
+.two{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px 32px;padding:16px}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:18px}
+.figs .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block}
+.gauge{margin:34px 4px 4px}
+.gtrack{position:relative;height:16px;background:var(--sunk);border:1px solid var(--line);border-radius:2px}
+.gfill{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.gfill.warn{background:var(--warn)} .gfill.bad{background:var(--bad)} .gfill.ok{background:var(--ok)}
+.gstd{position:absolute;top:-8px;bottom:-8px;width:2px;background:var(--fg)}
+.gstd span{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:600 12px var(--font-body);white-space:nowrap;padding-bottom:2px}
+.gticks{position:relative;height:20px;margin-top:6px;font-size:12px;color:var(--muted)}
+.gticks span{position:absolute;transform:translateX(-50%)}
+.gticks span:first-child{transform:none}
+.gticks span:last-child{transform:translateX(-100%)}
+.reasons{display:flex;flex-direction:column;gap:8px;margin:10px 0 16px}
+.reason{display:grid;grid-template-columns:minmax(0,9rem) 1fr auto;gap:10px;align-items:center;font-size:14px}
+.reason .bar{margin:0}
+.reason .bar>i{background:var(--bad)}
+.subform{border-top:1px solid var(--line);padding-top:14px}
+
+/* tables */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{text-align:left;padding:10px 14px;border-top:1px solid var(--line);vertical-align:top;font-size:14px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;border-top:0;background:var(--sunk)}
+td.r,th.r{text-align:right}
+tr.qrow td{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--warn) 9%,var(--surface)) 0 8px,var(--surface) 8px 16px)}
+
+@media (max-width:760px){
+  .line{grid-template-columns:minmax(0,1fr)}
+  .two{grid-template-columns:minmax(0,1fr)}
+  h1{font-size:28px}
+}
+@media (prefers-reduced-motion:no-preference){.gfill{transition:width .3s}}
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script>
+let PRODUCT={code:'',name:'',base:100000,std:0.98};
+let BOM=[];
+let REASONS=[];
+const S={tab:'orders',sel:null,lots:[],orders:[],issues:[],outs:[],form:{},outForm:{},msg:{},createMsg:'',booted:false};
+
+async function api(path,body){
+  const opt=body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+  const r=await fetch(path,opt); let d=null; try{d=await r.json();}catch(e){}
+  return {ok:r.ok,data:d};
+}
+async function load(){
+  const r=await api('/api/state'); if(!r.ok) return;
+  const d=r.data;
+  PRODUCT=d.product; BOM=d.bom; REASONS=d.reasons;
+  S.lots=d.lots; S.orders=d.orders; S.issues=d.issues; S.outs=d.outs;
+  if(!S.sel||!ordOf(S.sel)) S.sel=ordOf('PO-1042')?'PO-1042':(S.orders[0]||{}).no;
+  if(!S.booted){
+    S.booted=true;
+    // demo: the operator has scanned a quarantined resin lot for PO-1042 but not issued it yet
+    const o=ordOf('PO-1042'), b=bomOf('RM-PP-001');
+    if(o&&b&&r2(req(o,b)-issuedQty(o,b.item))>0&&lotOf('PP-2609-B')&&lotOf('PP-2609-B').status==='Quarantined'){
+      S.form['PO-1042-RM-PP-001']={lot:'PP-2609-B',qty:r2(req(o,b)-issuedQty(o,b.item)),scanned:'S. Devi, scanner at line 2'};
+    }
+  }
+}
+
+const $=s=>document.querySelector(s);
+const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:2});
+const f=n=>nf.format(n);
+const r2=x=>Math.round(x*100)/100;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stamp=()=>new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}).replace(',','');
+
+const ordOf=no=>S.orders.find(o=>o.no===no);
+const bomOf=item=>BOM.find(b=>b.item===item);
+const lotOf=id=>S.lots.find(l=>l.id===id);
+const req=(o,b)=>r2(b.qty*o.qty/PRODUCT.base);
+const issuedQty=(o,item)=>r2(S.issues.filter(i=>i.ok&&i.order===o.no&&i.item===item).reduce((a,i)=>a+i.qty,0));
+const lotUsed=id=>r2(S.issues.filter(i=>i.ok&&i.lot===id).reduce((a,i)=>a+i.qty,0));
+const lotBal=l=>r2(l.received-lotUsed(l.id));
+const outSum=(o,kind)=>S.outs.filter(x=>x.order===o.no&&x.kind===kind).reduce((a,x)=>a+x.qty,0);
+function yieldOf(o){
+  const good=outSum(o,'good'), scrap=outSum(o,'scrap'), total=good+scrap;
+  const y=total?good/total:null;
+  return {good,scrap,total,y,gap:y===null?null:(y-PRODUCT.std)*100,excess:total?scrap-Math.round(total*(1-PRODUCT.std)):0};
+}
+function yieldTone(gap){ if(gap===null) return 'mute'; if(gap>=-0.5) return 'ok'; if(gap>=-1.5) return 'warn'; return 'bad'; }
+function varTone(p){ const a=Math.abs(p); return a<=2?'ok':a<=5?'warn':'bad'; }
+const statusTone=s=>s==='Completed'?'mute':s==='In production'?'acc':'ok';
+const signed=(n,d=2)=>(n>0?'+':n<0?'−':'')+Math.abs(n).toFixed(d);
+
+function lotsFor(item){
+  return S.lots.filter(l=>l.item===item).sort((a,b)=>(a.status==='Released'?0:1)-(b.status==='Released'?0:1));
+}
+function getForm(o,b){
+  const key=o.no+'-'+b.item;
+  if(!S.form[key]){
+    const rem=r2(req(o,b)-issuedQty(o,b.item));
+    const lot=lotsFor(b.item).find(l=>l.status==='Released'&&lotBal(l)>0);
+    S.form[key]={lot:lot?lot.id:'',qty:lot&&rem>0?Math.min(rem,lotBal(lot)):''};
+  }
+  return S.form[key];
+}
+
+/* ---------- views ---------- */
+function header(){
+  const open=S.orders.filter(o=>o.status!=='Completed').length;
+  const q=S.lots.filter(l=>l.status==='Quarantined').length;
+  return `<header class="head">
+    <div>
+      <h1>Syringe line floor board</h1>
+      <p class="sub">${esc(PRODUCT.name)} <span class="mono">${PRODUCT.code}</span></p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="fig">${pctTxt(PRODUCT.std,1)}</div><div class="lbl">Standard yield</div></div>
+      <div class="stat"><div class="fig">${open}</div><div class="lbl">Open orders</div></div>
+      <div class="stat"><div class="fig">${q}</div><div class="lbl">Lots on QC hold</div></div>
+      <div class="stat"><button class="btn ghost" data-act="reset" title="Restore the demo data">Reset demo data</button></div>
+    </div>
+  </header>`;
+}
+const pctTxt=(v,d=2)=>(v*100).toFixed(d)+'%';
+function tabs(){
+  const t=[['orders','Production orders'],['bom','Bill of materials'],['lots','Stock lots']];
+  return `<div class="tabs" role="tablist">${t.map(([k,l])=>`<button class="tab" role="tab" id="tab-${k}" data-act="tab" data-v="${k}" aria-selected="${S.tab===k}">${l}</button>`).join('')}</div>`;
+}
+
+function ordersView(){
+  const cards=S.orders.map(o=>{
+    const y=yieldOf(o);
+    const full=BOM.filter(b=>issuedQty(o,b.item)>=req(o,b)).length;
+    return `<button class="ocard" data-act="sel" data-v="${o.no}" aria-pressed="${S.sel===o.no}">
+      <span class="top"><span class="no">${o.no}</span><span class="pill ${statusTone(o.status)}">${o.status}</span></span>
+      <span class="num">${f(o.qty)} syringes</span>
+      <span class="small ${y.y===null?'muted':yieldTone(y.gap)+'-t'}">${y.y===null?'No output recorded yet':'Yield '+pctTxt(y.y)+' ('+signed(y.gap)+' pts vs standard)'}</span>
+      <span class="small muted">${full} of ${BOM.length} materials fully issued</span>
+    </button>`;
+  }).join('');
+  const o=ordOf(S.sel);
+  return `<section class="panel">
+      <div class="panel-head"><h2>New production order</h2><span class="small muted">The order pulls its material list from the bill of materials.</span></div>
+      <div class="panel-pad">
+        <div class="formrow">
+          <label class="f qty" style="flex-basis:170px"><span>Good syringes to make</span><input id="new-qty" type="number" inputmode="numeric" min="1000" step="1000" value="100000"></label>
+          <button class="btn" data-act="create">Create order from BOM</button>
+        </div>
+        ${S.createMsg?`<div class="notice ${S.createMsg.kind}">${esc(S.createMsg.text)}</div>`:''}
+      </div>
+    </section>
+    <div class="picker">${cards}</div>
+    ${o?orderDetail(o):''}`;
+}
+
+function lineHTML(o,b){
+  const rq=req(o,b), iss=issuedQty(o,b.item), rem=r2(rq-iss), closed=o.status==='Completed';
+  const showVar=closed||rem<=0;
+  const v=r2(iss-rq), vp=rq?v/rq*100:0;
+  const varChip=showVar?(v===0?`<span class="pill ok">On plan</span>`:`<span class="pill ${varTone(vp)}">${signed(v,v%1?2:0).replace(/\.00$/,'')} ${b.unit} (${signed(vp,1)}%)</span>`):'';
+  const used={};
+  S.issues.filter(i=>i.ok&&i.order===o.no&&i.item===b.item).forEach(i=>used[i.lot]=r2((used[i.lot]||0)+i.qty));
+  const chips=Object.keys(used).length?Object.entries(used).map(([l,q])=>`<span class="chip">${l} · ${f(q)} ${b.unit}</span>`).join(''):`<span class="small muted">No lots issued yet</span>`;
+  const key=o.no+'-'+b.item;
+  let right='';
+  if(closed){
+    right=`<p class="small muted">Order closed. Issues are locked.</p>`;
+  } else {
+    const fm=getForm(o,b);
+    const opts=lotsFor(b.item).map(l=>`<option value="${l.id}" ${fm.lot===l.id?'selected':''}>${l.id} · ${l.status==='Released'?'Released':'QUARANTINED'} · ${f(lotBal(l))} ${b.unit}</option>`).join('');
+    const rel=lotsFor(b.item).filter(l=>l.status==='Released').reduce((a,l)=>a+lotBal(l),0);
+    const qua=lotsFor(b.item).filter(l=>l.status!=='Released').reduce((a,l)=>a+lotBal(l),0);
+    let stock='';
+    if(rem>0){
+      stock=r2(rel)<rem?`<p class="hint warn-t">Released stock is ${f(r2(rel))} ${b.unit}. Short by ${f(r2(rem-rel))} ${b.unit}${qua>0?`; ${f(qua)} ${b.unit} more is on QC hold.`:'.'}</p>`:`<p class="hint mute-t">Released stock available: ${f(r2(rel))} ${b.unit}.</p>`;
+    }
+    const m=S.msg[key];
+    right=`${fm.scanned?`<div class="notice warn scan"><b>Scanned, not issued yet.</b> ${esc(fm.scanned)}: ${esc(fm.lot)} for ${f(fm.qty)} ${b.unit}.</div>`:''}
+      <div class="formrow">
+        <label class="f grow"><span>Lot</span><select id="lot-${key}" data-lot="${key}">${opts}</select></label>
+        <label class="f qty"><span>Qty (${b.unit})</span><input id="qty-${key}" type="number" inputmode="decimal" min="0" step="any" value="${fm.qty}" data-qty="${key}" data-i="${b.item}"></label>
+        <button class="btn" data-act="issue" data-o="${o.no}" data-i="${b.item}">${rem<=0?'Issue extra':'Issue'}</button>
+      </div>
+      <div class="hint" id="hint-${key}">${hintHTML(b,fm)}</div>
+      ${stock}
+      ${m?`<div class="notice ${m.kind}" role="status">${esc(m.text)}</div>`:''}`;
+  }
+  return `<div class="line">
+    <div>
+      <div class="nm">${esc(b.name)}</div>
+      <div class="mono muted">${b.item}</div>
+      <div class="nums">
+        <div><span class="k">Plan</span><span class="fig num">${f(rq)} <small>${b.unit}</small></span></div>
+        <div><span class="k">Issued</span><span class="fig num">${f(iss)} <small>${b.unit}</small></span></div>
+        <div><span class="k">${showVar?'Variance':'Still to issue'}</span>${showVar?`<span style="margin-top:3px">${varChip}</span>`:`<span class="fig num">${f(rem)} <small>${b.unit}</small></span>`}</div>
+      </div>
+      <div class="bar"><i class="${iss>rq?'over':''}" style="width:${Math.min(iss/rq,1)*100}%"></i></div>
+      <div class="chips">${chips}</div>
+    </div>
+    <div>${right}</div>
+  </div>`;
+}
+function hintHTML(b,fm){
+  const lot=lotOf(fm.lot); if(!lot) return '';
+  if(lot.status!=='Released') return `<span class="bad-t"><b>${lot.id} is quarantined</b> (${esc(lot.hold)}). The system will refuse this issue.</span>`;
+  const bal=lotBal(lot), q=Number(fm.qty)||0;
+  if(q>bal) return `<span class="bad-t">${lot.id} has only ${f(bal)} ${b.unit} left.</span>`;
+  return `<span class="mute-t">${lot.id} balance ${f(bal)} ${b.unit}${q>0?`; ${f(r2(bal-q))} ${b.unit} would stay in the lot`:''}.</span>`;
+}
+
+function gaugeHTML(y){
+  const pos=v=>Math.max(0,Math.min(1,(v*100-94)/6))*100;
+  const tone=yieldTone(y.gap);
+  return `<div class="gauge">
+    <div class="gtrack">${y.y===null?'':`<div class="gfill ${tone}" style="width:${pos(y.y)}%"></div>`}<div class="gstd" style="left:${pos(PRODUCT.std)}%"><span>Standard ${pctTxt(PRODUCT.std,1)}</span></div></div>
+    <div class="gticks"><span style="left:0">94%</span><span style="left:33.33%">96%</span><span style="left:66.67%">98%</span><span style="left:100%">100%</span></div>
+  </div>`;
+}
+
+function orderDetail(o){
+  const y=yieldOf(o), closed=o.status==='Completed';
+  const lines=BOM.map(b=>lineHTML(o,b)).join('');
+  const reasons={};
+  S.outs.filter(x=>x.order===o.no&&x.kind==='scrap').forEach(x=>reasons[x.reason]=(reasons[x.reason]||0)+x.qty);
+  const maxR=Math.max(1,...Object.values(reasons));
+  const rs=Object.keys(reasons).length?Object.entries(reasons).sort((a,b)=>b[1]-a[1]).map(([r,q])=>`<div class="reason"><span>${esc(r)}</span><div class="bar"><i style="width:${q/maxR*100}%"></i></div><span class="num">${f(q)}</span></div>`).join(''):`<p class="small muted">No scrap recorded.</p>`;
+  const of=S.outForm[o.no]||(S.outForm[o.no]={kind:'good',reason:REASONS[0],qty:''});
+  const ropts=REASONS.map(r=>`<option ${of.reason===r?'selected':''}>${r}</option>`).join('');
+  const gapTxt=y.y===null?'No output recorded yet.':`${Math.abs(y.gap).toFixed(2)} points ${y.gap<0?'below':'above'} standard. ${y.excess>0?f(y.excess)+' more syringes scrapped than the standard allows.':'Scrap is within the standard.'}`;
+  const outList=S.outs.filter(x=>x.order===o.no).slice().reverse().slice(0,6).map(x=>`<tr><td class="small">${esc(x.time)}</td><td>${x.kind==='good'?'Good output':'Scrap: '+esc(x.reason)}</td><td class="r num">${f(x.qty)}</td></tr>`).join('');
+  const log=S.issues.filter(i=>i.order===o.no).slice().reverse().map(i=>{
+    const b=bomOf(i.item);
+    return `<tr><td class="small">${esc(i.time)}</td><td>${esc(b.name)}</td><td class="mono">${i.lot}</td><td class="r num">${f(i.qty)} ${b.unit}</td><td>${esc(i.by)}</td><td>${i.ok?'<span class="pill ok">Issued</span>':`<span class="pill bad">Blocked</span><div class="small bad-t" style="margin-top:4px">${esc(i.why)}</div>`}</td></tr>`;
+  }).join('');
+  return `<section class="panel" aria-label="${o.no} materials">
+      <div class="panel-head"><h2>${o.no} · Materials</h2><span class="pill ${statusTone(o.status)}">${o.status}</span></div>
+      ${lines}
+    </section>
+    <section class="panel" aria-label="${o.no} output and yield">
+      <div class="panel-head"><h2>${o.no} · Output and yield</h2>${!closed&&y.total>0?`<button class="btn ghost" data-act="close" data-o="${o.no}">Close order</button>`:''}</div>
+      <div class="two">
+        <div>
+          <div class="figs">
+            <div><span class="k">Good</span><span class="fig num">${f(y.good)}</span></div>
+            <div><span class="k">Scrap</span><span class="fig num">${f(y.scrap)}</span></div>
+            <div><span class="k">Actual yield</span><span class="fig num ${y.y===null?'':yieldTone(y.gap)+'-t'}">${y.y===null?'–':pctTxt(y.y)}</span></div>
+            <div><span class="k">Vs standard</span><span class="fig num ${y.y===null?'':yieldTone(y.gap)+'-t'}">${y.y===null?'–':signed(y.gap)+' pts'}</span></div>
+          </div>
+          ${gaugeHTML(y)}
+          <p class="small" style="margin-top:6px">${gapTxt}</p>
+          <p class="small muted" style="margin-top:4px">Yield is good output divided by good plus scrap. Target for this order: ${f(o.qty)} good.</p>
+        </div>
+        <div>
+          <h3>Scrap by reason</h3>
+          <div class="reasons">${rs}</div>
+          ${closed?`<p class="small muted">Order closed. No more entries.</p>`:`<div class="subform">
+            <div class="formrow">
+              <label class="f" style="flex:0 1 140px"><span>Entry</span><select id="out-kind-${o.no}" data-outkind="${o.no}"><option value="good" ${of.kind==='good'?'selected':''}>Good output</option><option value="scrap" ${of.kind==='scrap'?'selected':''}>Scrap</option></select></label>
+              ${of.kind==='scrap'?`<label class="f grow"><span>Reason</span><select id="out-reason-${o.no}" data-outreason="${o.no}">${ropts}</select></label>`:''}
+              <label class="f qty"><span>Syringes</span><input id="out-qty-${o.no}" type="number" inputmode="numeric" min="1" step="1" value="${of.qty}" data-outqty="${o.no}"></label>
+              <button class="btn" data-act="out" data-o="${o.no}">Record</button>
+            </div>
+            ${S.msg['out-'+o.no]?`<div class="notice ${S.msg['out-'+o.no].kind}" role="status">${esc(S.msg['out-'+o.no].text)}</div>`:''}
+          </div>`}
+        </div>
+      </div>
+      ${outList?`<div class="tw"><table><thead><tr><th>When</th><th>Entry</th><th class="r">Syringes</th></tr></thead><tbody>${outList}</tbody></table></div>`:''}
+    </section>
+    <section class="panel" aria-label="${o.no} issue log">
+      <div class="panel-head"><h2>${o.no} · Issue log</h2><span class="small muted">Every issue and every refused attempt, by lot</span></div>
+      <div class="tw"><table><thead><tr><th>When</th><th>Material</th><th>Lot</th><th class="r">Qty</th><th>By</th><th>Result</th></tr></thead><tbody>${log||'<tr><td colspan="6" class="muted">Nothing issued yet.</td></tr>'}</tbody></table></div>
+    </section>`;
+}
+
+function bomView(){
+  const rows=BOM.map(b=>`<tr><td class="mono">${b.item}</td><td>${esc(b.name)}</td><td class="r num">${f(b.qty)}</td><td>${b.unit}</td></tr>`).join('');
+  return `<section class="panel">
+    <div class="panel-head"><h2>${esc(PRODUCT.name)}</h2><span class="mono muted">${PRODUCT.code}</span></div>
+    <div class="tw"><table><thead><tr><th>Item</th><th>Material</th><th class="r">Per ${f(PRODUCT.base)} syringes</th><th>Unit</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="panel-pad small muted">An order for N syringes needs N ÷ ${f(PRODUCT.base)} times these quantities. The figures already include normal allowance. Standard yield is ${pctTxt(PRODUCT.std,1)}.</div>
+  </section>`;
+}
+
+function lotsView(){
+  const rows=S.lots.map(l=>{
+    const b=bomOf(l.item), used=lotUsed(l.id), bal=lotBal(l);
+    const uses={};
+    S.issues.filter(i=>i.ok&&i.lot===l.id).forEach(i=>uses[i.order]=r2((uses[i.order]||0)+i.qty));
+    const chips=Object.keys(uses).length?Object.entries(uses).map(([o,q])=>`<span class="chip">${o} · ${f(q)}</span>`).join(' '):'<span class="small muted">Not used</span>';
+    const partly=l.status==='Released'&&bal>0&&used>0;
+    return `<tr class="${l.status==='Quarantined'?'qrow':''}">
+      <td class="mono">${l.id}<div class="small muted" style="font-family:var(--font-body)">${esc(b.name)}</div></td>
+      <td>${l.status==='Released'?'<span class="pill ok">Released</span>':`<span class="pill hold">Quarantined</span><div class="small warn-t" style="margin-top:4px">${esc(l.hold)}</div>`}${partly?'<div style="margin-top:4px"><span class="pill acc">Partly used</span></div>':''}${l.status==='Released'&&bal<=0?'<div style="margin-top:4px"><span class="pill mute">Used up</span></div>':''}</td>
+      <td class="r num">${f(l.received)} ${b.unit}<div class="small muted">${l.date}</div></td>
+      <td class="r num">${f(used)}</td>
+      <td class="r num"><b>${f(bal)}</b></td>
+      <td><div class="chips">${chips}</div></td>
+    </tr>`;
+  }).join('');
+  return `<section class="panel">
+    <div class="panel-head"><h2>Stock lots</h2><span class="small muted">Only QC changes a lot from quarantined to released.</span></div>
+    <div class="tw"><table style="min-width:760px"><thead><tr><th>Lot</th><th>Status</th><th class="r">Received</th><th class="r">Issued</th><th class="r">Balance</th><th>Used in batches</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </section>`;
+}
+
+function render(){
+  $('#app').innerHTML=header()+tabs()+(S.tab==='orders'?ordersView():S.tab==='bom'?bomView():lotsView());
+}
+
+/* ---------- actions ---------- */
+async function doIssue(no,item){
+  const b=bomOf(item), key=no+'-'+item, fm=S.form[key];
+  const r=await api('/api/issues',{order:no,item,lot:fm.lot,qty:Number(fm.qty)});
+  await load();
+  if(r.ok){
+    S.msg[key]={kind:r.data.warn?'warn':'ok',text:r.data.message};
+    delete S.form[key];
+  } else {
+    S.msg[key]={kind:'bad',text:'Refused. '+((r.data&&r.data.detail)||'Something went wrong.')+' Nothing was issued.'};
+  }
+  render();
+}
+async function doOut(no){
+  const of=S.outForm[no], q=Number(of.qty);
+  if(!(q>0)||!Number.isInteger(q)){S.msg['out-'+no]={kind:'bad',text:'Enter a whole number of syringes.'};render();return;}
+  const r=await api('/api/outputs',{order:no,kind:of.kind,qty:q,reason:of.kind==='scrap'?of.reason:null});
+  await load();
+  S.msg['out-'+no]=r.ok?{kind:'ok',text:`Recorded ${f(q)} ${of.kind==='good'?'good syringes':'scrapped ('+of.reason+')'}. Yield updated.`}:{kind:'bad',text:(r.data&&r.data.detail)||'Something went wrong.'};
+  if(r.ok) of.qty='';
+  render();
+}
+async function doCreate(){
+  const q=Number($('#new-qty').value);
+  const r=await api('/api/orders',{qty:q});
+  if(!r.ok){S.createMsg={kind:'bad',text:(r.data&&r.data.detail)||'Could not create the order.'};render();return;}
+  await load();
+  S.sel=r.data.no;
+  S.createMsg={kind:'ok',text:`${r.data.no} created for ${f(q)} syringes. Material needs are scaled from the BOM. Nothing is issued yet.`};
+  render();
+}
+
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]'); if(!t) return;
+  const a=t.dataset.act;
+  if(a==='tab'){S.tab=t.dataset.v;location.hash=S.tab;render();}
+  else if(a==='sel'){S.sel=t.dataset.v;render();}
+  else if(a==='issue') doIssue(t.dataset.o,t.dataset.i);
+  else if(a==='out') doOut(t.dataset.o);
+  else if(a==='create') doCreate();
+  else if(a==='close'){api('/api/orders/'+t.dataset.o+'/close',{}).then(load).then(render);}
+  else if(a==='reset'){api('/api/reset',{}).then(()=>{S.form={};S.msg={};S.createMsg='';S.booted=false;S.sel=null;return load();}).then(render);}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.lot){
+    const fm=S.form[t.dataset.lot]; fm.lot=t.value; delete fm.scanned;
+    delete S.msg[t.dataset.lot]; render();
+    const el=document.getElementById('lot-'+t.dataset.lot); if(el) el.focus();
+  } else if(t.dataset.outkind){S.outForm[t.dataset.outkind].kind=t.value;render();}
+  else if(t.dataset.outreason){S.outForm[t.dataset.outreason].reason=t.value;}
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.qty){
+    const fm=S.form[t.dataset.qty]; fm.qty=t.value;
+    const item=t.dataset.i;
+    const h=document.getElementById('hint-'+t.dataset.qty); if(h) h.innerHTML=hintHTML(bomOf(item),fm);
+  } else if(t.dataset.outqty){S.outForm[t.dataset.outqty].qty=t.value;}
+});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(['orders','bom','lots'].includes(h)){S.tab=h;render();}});
+(function(){const h=location.hash.slice(1);if(['orders','bom','lots'].includes(h)) S.tab=h;})();
+load().then(render);
+</script>
